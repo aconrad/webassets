@@ -510,6 +510,27 @@ class TestBuiltinFilters(TempEnvironmentHelper):
         self.mkbundle('foo.js', 'foo2.js', filters='uglifyjs', output='out.js').build()
         assert self.get('out.js') == 'function foo(bar){var dummy;document.write(bar);var a="Ünícôdè"}more();'
 
+    def test_slimit_ascii(self):
+        try:
+            self.mkbundle('foo2.js', filters='slimit', output='out.js').build()
+        except EnvironmentError:
+            raise SkipTest("slimit is not installed")
+        assert self.get('out.js') == 'more();'
+
+    def test_slimit_unicode(self):
+        try:
+            self.mkbundle('foo.js', filters='slimit', output='out.js').build()
+        except EnvironmentError:
+            raise SkipTest("slimit is not installed")
+        assert self.get('out.js') == 'function foo(bar){var dummy;document.write(bar);var a="Ünícôdè";}'
+
+    def test_slimit_ascii_and_unicode(self):
+        try:
+            self.mkbundle('foo.js', 'foo2.js', filters='slimit', output='out.js').build()
+        except EnvironmentError:
+            raise SkipTest("slimit is not installed")
+        assert self.get('out.js') == 'function foo(bar){var dummy;document.write(bar);var a="Ünícôdè";}more();'
+
     def test_less_ruby(self):
         # TODO: Currently no way to differentiate the ruby lessc from the
         # JS one. Maybe the solution is just to remove the old ruby filter.
@@ -971,6 +992,32 @@ class TestPyScss(TempEnvironmentHelper):
         assert doctest_match(
             'h1 {\n  background: url("...png");\n}\n',
             self.get('out.css'),)
+
+
+class TestLibSass(TempEnvironmentHelper):
+    default_files = {
+        'foo.scss': '@import "bar"; a {color: red + green; }',
+        'bar.scss': 'h1{color:red}'
+    }
+
+    def setup(self):
+        try:
+            import sass
+            self.sass = sass
+        except ImportError:
+            raise SkipTest()
+        TempEnvironmentHelper.setup(self)
+
+    def test(self):
+        self.mkbundle('foo.scss', filters='libsass', output='out.css').build()
+        assert self.get('out.css') == (
+            'h1 {\n  color: red; }\n\na {\n  color: #ff8000; }\n'
+        )
+
+    def test_compressed(self):
+        libsass = get_filter('libsass', style='compressed')
+        self.mkbundle('foo.scss', filters=libsass, output='out.css').build()
+        assert self.get('out.css') == 'h1{color:red;}a{color:#ff8000;}'
 
 
 class TestCompass(TempEnvironmentHelper):
